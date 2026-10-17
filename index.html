@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scribble → SVG or emoji</title>
+<style>
+  :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; color: #182036; background: #f4f6fb; }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .wrap { max-width: 1220px; margin: 0 auto; padding: 28px 24px 48px; }
+  .eyebrow { color: #5559c5; font-size: 12px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+  h1 { margin: 9px 0 8px; font-size: clamp(30px, 4vw, 43px); line-height: 1.12; letter-spacing: -.04em; }
+  .intro { margin: 0 0 24px; color: #687187; font-size: 16px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+  .card { min-width: 0; padding: 18px; border: 1px solid #e4e8f0; border-radius: 20px; background: #fff; box-shadow: 0 10px 30px rgba(30, 42, 80, .055); }
+  .card-head { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; }
+  .step { display: grid; place-items: center; width: 27px; height: 27px; border-radius: 8px; background: #eef0ff; color: #5559c5; font-size: 12px; font-weight: 800; }
+  h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
+  canvas, .preview { display: block; width: 100%; height: auto; aspect-ratio: 1; border: 1px solid #dfe4ee; border-radius: 13px; background: #fff; }
+  canvas { touch-action: none; cursor: crosshair; }
+  .preview { overflow: hidden; }
+  .preview.empty { display: grid; place-items: center; padding: 24px; color: #939bad; text-align: center; background: #fafbfe; }
+  #out img { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+  button { min-height: 42px; padding: 0 12px; border: 1px solid transparent; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: background .15s, transform .15s; }
+  button:hover { transform: translateY(-1px); }
+  button:focus-visible { outline: 3px solid #a5adff; outline-offset: 2px; }
+  #go { background: #5559c5; color: #fff; }
+  #go:hover { background: #4448b1; }
+  #find-emoji { border-color: #d9ddf5; background: #f2f3ff; color: #4246a6; }
+  #find-emoji:hover { background: #e8eaff; }
+  #clr { border-color: #e1e5ed; background: #fff; color: #677086; }
+  #clr:hover { background: #f7f8fb; }
+  #emoji-out { display: grid; place-items: center; padding: 20px; text-align: center; font-size: 15px; overflow-wrap: anywhere; }
+  #emoji-out.emoji { font-size: clamp(80px, 10vw, 132px); line-height: 1; }
+  @media (max-width: 760px) {
+    .wrap { padding: 28px 16px 48px; }
+    .card { padding: 17px; }
+    .intro { margin-bottom: 22px; }
+  }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div class="eyebrow">Sketch lab</div>
+    <h1>Scribble → SVG or emoji</h1>
+    <p class="intro">Draw something rough, then turn it into a clean icon or find its closest emoji.</p>
+  </header>
+  <div class="row">
+    <section class="card" aria-labelledby="sketch-title">
+      <div class="card-head"><span class="step">01</span><h2 id="sketch-title">Your sketch</h2></div>
+      <canvas id="c" width="400" height="400" aria-label="Drawing canvas"></canvas>
+      <div class="actions">
+        <button id="go" type="button">Generate SVG</button>
+        <button id="find-emoji" type="button">Closest emoji</button>
+        <button id="clr" type="button">Clear</button>
+      </div>
+    </section>
+    <section class="card" aria-labelledby="result-title">
+      <div class="card-head"><span class="step">02</span><h2 id="result-title">SVG result</h2></div>
+      <div id="out" class="preview empty" aria-live="polite">Your SVG will appear here</div>
+    </section>
+    <section class="card" aria-labelledby="emoji-title">
+      <div class="card-head"><span class="step">03</span><h2 id="emoji-title">Closest emoji</h2></div>
+      <div id="emoji-out" class="preview empty" aria-live="polite">Your emoji will appear here</div>
+    </section>
+  </div>
+</main>
+
+<script>
+const c = document.getElementById('c'), x = c.getContext('2d');
+const out = document.getElementById('out');
+const emojiOut = document.getElementById('emoji-out');
+
+function reset() {
+  x.fillStyle = '#fff';            // white background: transparent PNGs turn black for the model
+  x.fillRect(0, 0, 400, 400);
+  x.lineWidth = 6;                 // thick strokes survive downscaling
+  x.lineCap = 'round';
+  x.strokeStyle = '#000';
+}
+reset();
+
+let down = false;
+const pos = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
+c.onpointerdown = e => { down = true; x.beginPath(); x.moveTo(...pos(e)); };
+c.onpointermove = e => { if (down) { x.lineTo(...pos(e)); x.stroke(); } };
+window.onpointerup = () => down = false;
+
+document.getElementById('clr').onclick = () => {
+  reset();
+  out.textContent = 'Your SVG will appear here';
+  out.classList.add('empty');
+  emojiOut.textContent = 'Your emoji will appear here';
+  emojiOut.classList.remove('emoji');
+  emojiOut.classList.add('empty');
+};
+
+document.getElementById('go').onclick = async () => {
+  out.classList.add('empty');
+  out.textContent = 'Generating SVG…';
+  try {
+    const res = await fetch('/draw', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: c.toDataURL('image/png') })
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.raw || `HTTP ${res.status}`);
+    if (d.svg) {
+      const img = new Image();
+      img.alt = 'Generated SVG';
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(d.svg);
+      out.classList.remove('empty');
+      out.replaceChildren(img);
+    } else {
+      out.textContent = 'No SVG returned: ' + d.raw;
+    }
+  } catch (err) {
+    out.textContent = 'Error: ' + err;
+  }
+};
+
+document.getElementById('find-emoji').onclick = async () => {
+  emojiOut.classList.remove('emoji');
+  emojiOut.classList.add('empty');
+  emojiOut.textContent = 'Finding emoji…';
+  try {
+    const res = await fetch('/emoji', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: c.toDataURL('image/png') })
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.raw || `HTTP ${res.status}`);
+    emojiOut.textContent = d.emoji || 'No emoji returned';
+    emojiOut.classList.toggle('emoji', Boolean(d.emoji));
+    emojiOut.classList.toggle('empty', !d.emoji);
+  } catch (err) {
+    emojiOut.textContent = 'Error: ' + err;
+  }
+};
+</script>
+</body>
+</html>
